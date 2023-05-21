@@ -1,0 +1,11 @@
+{
+  "name": "gpt-subtrans-node",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "author": "nekosaur",
+  "license": "MIT",
+  "scripts": {
+    "develop:app": "pnpm --filter=@gpt-subtrans-node/app develop"
+  }
+}
