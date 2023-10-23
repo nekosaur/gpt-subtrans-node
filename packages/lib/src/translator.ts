@@ -1,4 +1,4 @@
-import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from 'openai'
+import OpenAI from 'openai'
 import { parseResponse } from './helpers'
 import { SubtitleLine, Subtitles } from './subtitles'
 
@@ -13,14 +13,12 @@ export type Translation = {
 }
 
 export class Translator {
-  api: OpenAIApi
+  api: OpenAI
 
   constructor(private options: TranslatorOptions) {
-    const configuration = new Configuration({
+    this.api = new OpenAI({
       apiKey: this.options.apiKey,
     })
-
-    this.api = new OpenAIApi(configuration)
 
     this.options.instructions ??= `Your task is to accurately translate subtitles into a target language. The user will provide lines from a scene in the following format:
 
@@ -48,13 +46,16 @@ Summary
 `
   }
 
-  public async translateLines(data: {
-    subtitles: Subtitles
-    lines: SubtitleLine[]
-    summary?: string
-  }): Promise<Translation> {
+  public async translateLines(
+    data: {
+      subtitles: Subtitles
+      lines: SubtitleLine[]
+      summary?: string
+    },
+    options?: OpenAI.RequestOptions
+  ): Promise<Translation> {
     const { subtitles, lines, summary } = data
-    const messages: ChatCompletionRequestMessage[] = [
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
       {
         role: 'system',
         content: this.options.instructions,
@@ -82,24 +83,28 @@ Summary
       content,
     })
 
-    const response = await this.api.createChatCompletion({
-      model: 'gpt-3.5-turbo',
-      messages,
-      temperature: 0.1,
-    })
+    const response = await this.api.chat.completions.create(
+      {
+        model: 'gpt-3.5-turbo',
+        messages,
+        temperature: 0.1,
+      },
+      options
+    )
 
-    if (!response.data.choices.length) {
-      throw new Error('no reponse')
+    if (!response.choices.length) {
+      throw new Error('no response')
     }
 
-    if (response.data.choices[0].finish_reason !== 'stop') {
+    if (response.choices[0].finish_reason !== 'stop') {
       throw new Error('finish_reason not stop')
     }
 
-    const parsed = parseResponse(response.data.choices[0].message)
+    const parsed = parseResponse(response.choices[0].message)
 
     if (parsed.lines.length !== data.lines.length) {
-      throw new Error('Mismatch in translated lines')
+      console.log(JSON.stringify(parsed.lines, null, 2))
+      throw new Error('mismatch in translated lines')
     }
 
     return {

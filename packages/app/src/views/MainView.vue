@@ -1,29 +1,38 @@
 <template>
   <v-navigation-drawer temporary></v-navigation-drawer>
-  <v-footer app class="bg-grey-lighten-2">
-    {{ selected.length }} scene(s) selected
-    <v-btn :disabled="isTranslating" @click="handleSelectAll">select all</v-btn>
-    <v-btn :disabled="isTranslating" @click="handleClearSelection"
-      >clear selection</v-btn
-    >
-    <v-btn :disabled="isTranslating" @click="handleMergeScenes"
-      >merge selected scenes</v-btn
-    >
-    <v-btn :disabled="isTranslating" @click="handleTranslate">translate</v-btn>
-    <v-btn :disabled="isTranslating" @click="handleSave">save</v-btn>
+  <v-footer app class="bg-grey-lighten-2 justify-space-between">
+    {{ store.selection.length }} scene(s) selected
+    <div>
+      <v-btn :disabled="isTranslating" @click="handleMergeScenes"
+        >merge selected scenes</v-btn
+      >
+      <v-btn :disabled="isTranslating" @click="handleTranslate"
+        >translate</v-btn
+      >
+      <v-btn :disabled="isTranslating" @click="handleSave">save</v-btn>
+      <v-btn v-if="isTranslating" @click="cancelTranslate">Cancel</v-btn>
+    </div>
   </v-footer>
   <v-main>
     <div class="d-flex flex-column ma-2">
       <template v-for="(scene, index) in scenes" :key="index">
         <div>
-          <div class="d-flex justify-space-between">
-            <div>
+          <div class="d-flex justify-space-between my-2">
+            <div class="d-flex align-center">
               <v-checkbox-btn
-                v-model="selected"
+                v-model="store.selection"
                 :value="index"
                 :disabled="isTranslating"
               ></v-checkbox-btn>
-              <h3>Scene {{ index + 1 }}</h3>
+              <h3 class="ml-2">Scene {{ index + 1 }}</h3>
+              <template v-if="scene.summary">
+                <v-btn variant="plain">
+                  <v-icon icon="mdi-help-circle-outline" />
+                  <v-tooltip activator="parent" location="bottom">
+                    {{ scene.summary }}
+                  </v-tooltip>
+                </v-btn>
+              </template>
             </div>
             <template v-if="store.translating.includes(index)">
               <div>
@@ -32,11 +41,6 @@
               </div>
             </template>
           </div>
-          <template v-if="scene.summary">
-            <v-alert type="info">
-              {{ scene.summary }}
-            </v-alert>
-          </template>
           <v-card class="ma-2">
             <v-card-text>
               <template v-for="line in scene.lines" :key="line.index">
@@ -70,13 +74,10 @@
 import { useStore } from '../store'
 import { computed } from 'vue'
 import { formatTimestamp, getAllScenes } from '@gpt-subtrans-node/lib'
-import { ref } from 'vue'
 import { ipcRenderer } from 'electron'
 import { toRaw } from 'vue'
 
 const store = useStore()
-
-const selected = ref<number[]>([])
 
 const scenes = computed(() => {
   if (!store.subtitles) return []
@@ -87,31 +88,31 @@ const scenes = computed(() => {
 const isTranslating = computed(() => !!store.translating.length)
 
 async function handleTranslate() {
-  store.translating = selected.value
+  store.translating = store.selection
 
   ipcRenderer.send('app:subtitles:translate-scenes', {
     subtitles: toRaw(store.subtitles),
-    scenes: toRaw(selected.value).sort((a, b) => a - b),
+    scenes: toRaw(store.selection).sort((a, b) => a - b),
   })
 
-  selected.value = []
+  // TODO: reset selection to those translates that were not successful
+  // store.selection = []
 }
 
-function handleSelectAll() {
-  selected.value = scenes.value.map((_, index) => index)
-}
-
-function handleClearSelection() {
-  selected.value = []
+async function cancelTranslate() {
+  ipcRenderer.send('app:subtitles:cancel-translate-scene', {
+    scenes: toRaw(store.translating),
+  })
+  console.log('cancelling')
 }
 
 async function handleMergeScenes() {
   ipcRenderer.send('app:subtitles:merge-scenes', {
     subtitles: toRaw(store.subtitles),
-    scenes: toRaw(selected.value).sort((a, b) => a - b),
+    scenes: toRaw(store.selection).sort((a, b) => a - b),
   })
 
-  selected.value = []
+  store.selection = []
 }
 
 async function handleSave() {

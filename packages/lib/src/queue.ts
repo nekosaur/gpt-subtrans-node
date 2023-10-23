@@ -10,9 +10,9 @@ export class Queue<T, K> {
       ...options,
       store: new MemoryStore(),
       process: (task: T, callback: ProcessFunctionCb<K>) => {
-        backOff(
+        return backOff(
           async () => {
-            options.process(task, callback)
+            return options.process(task, callback)
           },
           {
             numOfAttempts: 5,
@@ -29,5 +29,9 @@ export class Queue<T, K> {
 
   public push(task: T, callback: ProcessFunctionCb<K>) {
     this.queue.push(task, callback)
+  }
+
+  public cancel(taskId: unknown, callback?: () => void) {
+    this.queue.cancel(taskId, callback)
   }
 }

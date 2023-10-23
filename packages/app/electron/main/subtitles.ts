@@ -16,26 +16,34 @@ import { win } from '.'
 
 global.crypto = crypto
 
-const t = new Translator({
+const translator = new Translator({
   apiKey: store.get('settings').apiKey,
+  instructions: store.get('settings').instructions,
 })
 
 const translateQueue = new Queue<
   {
-    id: string
+    id: number
     subtitles: Subtitles
     lines: SubtitleLine[]
     summary?: string
   },
   Translation
 >({
+  id: "id",
   process: async (task, callback) => {
-    try {
-      const translation = await t.translateLines(task)
+    const abortController = new AbortController();
 
-      callback(null, translation)
-    } catch (err) {
+    translator.translateLines(task, { signal: abortController.signal }).then(translation => {
+      callback(null, translation);
+    }).catch(err => {
       callback(err)
+    })
+
+    return {
+      cancel: () => {
+        abortController.abort()
+      }
     }
   },
 })
@@ -114,20 +122,20 @@ ipcMain.handle('app:subtitles:load', async (_, data: { filePath: string, movieNa
 ipcMain.on('app:subtitles:translate-scenes', async (_, data: { subtitles: Subtitles, scenes: number[] }) => {
   const scenes = getIndexedScenes(data.subtitles, data.scenes)
 
-  let id = 0
   for (const scene of scenes) {
-    id += 1
     translateQueue.push(
       {
-        id: String(id),
+        id: scene.index,
         subtitles: data.subtitles,
         lines: scene.lines,
         summary: scene.summary,
       },
-      (err, translation) => {
-        if (err) {
+      (error, translation) => {
+        if (error) {
+          console.log('error!!', error)
           win.webContents.send('ui:state:translate-scene:error', {
-            err
+            index: scene.index,
+            error,
           })
         } else {
           console.log('translation done', translation)
@@ -141,6 +149,16 @@ ipcMain.on('app:subtitles:translate-scenes', async (_, data: { subtitles: Subtit
   }
 })
 
+ipcMain.on('app:subtitles:cancel-translate-scene', async (_, data: { scenes: number [] }) => {
+  for (const scene of data.scenes) {
+    translateQueue.cancel(scene, () => {
+      win.webContents.send('ui:state:translate-scene:cancel', {
+        index: scene,
+      })
+    })
+  }
+})
+
 ipcMain.on('app:subtitles:merge-scenes', async (_, data: { subtitles: Subtitles, scenes: number[] }) => {
   const subtitles = mergeScenes(data)
 
@@ -150,7 +168,7 @@ ipcMain.on('app:subtitles:merge-scenes', async (_, data: { subtitles: Subtitles,
 })
 
 ipcMain.on('app:state:subtitles:save', (_, data: { subtitles: Subtitles }) => {
-  fileQueue.push(data.subtitles, (err, result) => {
+  fileQueue.push(data.subtitles, (err, _) => {
     if (!err) {
       win.webContents.send('ui:notification', {
         message: 'Subtitle data saved',

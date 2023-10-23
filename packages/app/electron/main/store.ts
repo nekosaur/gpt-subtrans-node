@@ -7,8 +7,10 @@ import fs from 'fs-extra'
 type StoreData = {
   storagePath: string
   firstLoad: boolean
+  showAdvancedSettings: boolean
   settings: {
     apiKey: string
+    instructions: string
   }
 }
 
@@ -25,8 +27,33 @@ export class Store {
       defaults: {
         storagePath,
         firstLoad: true,
+        showAdvancedSettings: true,
         settings: {
           apiKey: '',
+          instructions: `Your task is to accurately translate subtitles into a target language. The user will provide lines from a scene in the following format:
+
+<t id="1">
+Dialogue to be translated
+</t>
+
+You should respond with one matching line in the target language for each original line, in the following format:
+
+<t id="1">
+Translated dialogue
+</t>
+
+It is important that you do not merge multiple lines into a single line, as this can lead to inaccuracies.
+
+Your translations should be concise and accurate, while still sounding natural; do not improvise.
+
+If the user provides a synopsis of the movie, a list of characters, or a summary of the current scene, use them to guide your translation.
+
+Include a one or two line summary of recent events at the end of each reply, in the following format:
+
+<s>
+Summary
+</s>
+`
         },
       },
       watch: true,
@@ -86,4 +113,12 @@ ipcMain.handle('app:get-settings', () => {
 ipcMain.handle('app:set-settings', async (_, settings) => {
   store.store.set('settings', settings)
   store.store.set('firstLoad', false)
+})
+
+ipcMain.handle('app:get-show-advanced-settings', () => {
+  return store.get('showAdvancedSettings')
+})
+
+ipcMain.handle('app:set-show-advanced-settings', (_, showAdvancedSettings) => {
+  store.store.set('showAdvancedSettings', showAdvancedSettings)
 })

@@ -4,12 +4,14 @@ import { ipcRenderer } from 'electron'
 import {
   SubtitleLine,
   SubtitleScene,
+  getAllScenes,
 } from '@gpt-subtrans-node/lib/src/subtitles'
 import { toRaw } from 'vue'
 
 type AppState = {
   subtitles: Subtitles | null
   translating: number[]
+  selection: number[]
   notifications: { message: string }[]
 }
 
@@ -20,10 +22,33 @@ export const useStore = defineStore('app', {
     return {
       subtitles: null,
       translating: [],
+      selection: [],
       notifications: [],
     }
   },
+  getters: {
+    scenes: state => {
+      if (!state.subtitles) return []
+
+      return getAllScenes(state.subtitles)
+    }
+  },
   actions: {
+    selectAll () {
+      this.selection = this.scenes.map((_, index) => index)
+    },
+    selectUntranslated () {
+      this.selection = this.scenes.reduce((curr, scene, index) => {
+        if (scene.lines.some(line => !line.translated)) {
+          curr.push(index)
+        }
+
+        return curr
+      }, [] as number[])
+    },
+    clearSelection () {
+      this.selection = []
+    },
     setSubtitles(subtitles: Subtitles) {
       this.subtitles = subtitles
     },
@@ -70,4 +95,16 @@ ipcRenderer.on('ui:notification', (_, data) => {
   const store = useStore(pinia)
 
   store.pushNotification(data)
+})
+
+ipcRenderer.on('ui:state:translate-scene:error', (_, data) => {
+  const store = useStore(pinia)
+
+  store.translating = store.translating.filter((index) => index !== data.index)
+})
+
+ipcRenderer.on('ui:state:translate-scene:cancel', (_, data) => {
+  const store = useStore(pinia)
+
+  store.translating = store.translating.filter((index) => index !== data.index)
 })

@@ -1,12 +1,11 @@
-import {
-  ChatCompletionRequestMessage,
-  ChatCompletionResponseMessage,
-} from 'openai'
+import OpenAI from 'openai'
 import { encode } from 'gpt-tokenizer'
 import { XMLParser } from 'fast-xml-parser'
 import { SubtitleLine, SubtitleScene } from './subtitles'
 
-export function countTokens(messages: ChatCompletionRequestMessage[]) {
+export function countTokens(
+  messages: OpenAI.Chat.ChatCompletionMessageParam[]
+) {
   const tokens = messages.reduce((total, msg) => {
     return total + 4 + encode(msg.content).length + encode(msg.role).length + 2
   }, 0)
@@ -14,7 +13,9 @@ export function countTokens(messages: ChatCompletionRequestMessage[]) {
   console.log(tokens)
 }
 
-export function parseResponse(response: ChatCompletionResponseMessage): {
+export function parseResponse(
+  response: OpenAI.Chat.Completions.ChatCompletionMessage
+): {
   lines: string[]
   summary: string
 } {

@@ -7,17 +7,20 @@ import { useStore } from '../store'
 
 const routes: RouteRecordRaw[] = [
   {
+    name: 'splash',
     path: '/',
     component: SplashView,
   },
   {
+    name: 'open',
     path: '/open',
     component: OpenView,
   },
   {
+    name: 'main',
     path: '/main',
     component: MainView,
-    beforeEnter(to, from) {
+    beforeEnter(_to, _from) {
       const store = useStore()
 
       if (!store.subtitles) {
@@ -26,6 +29,7 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    name: 'settings',
     path: '/settings',
     component: SettingsView,
   }
